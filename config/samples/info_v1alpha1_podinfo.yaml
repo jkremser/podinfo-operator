@@ -5,3 +5,4 @@ metadata:
 spec:
   backend-replicas: 2
   frontend-replicas: 1
+  message: "Hello Podinfo"

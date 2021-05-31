@@ -28,8 +28,9 @@ type PodinfoSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	FrontendReplicas int `json:"frontend-replicas,omitempty"`
-	BackendReplicas  int `json:"backend-replicas,omitempty"`
+	FrontendReplicas int    `json:"frontend-replicas,omitempty"`
+	BackendReplicas  int    `json:"backend-replicas,omitempty"`
+	Message          string `json:"message,omitempty"`
 }
 
 // PodinfoStatus defines the observed state of Podinfo

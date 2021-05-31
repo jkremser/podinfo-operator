@@ -40,6 +40,8 @@ spec:
                 type: integer
               frontend-replicas:
                 type: integer
+              message:
+                type: string
             type: object
           status:
             description: PodinfoStatus defines the observed state of Podinfo
