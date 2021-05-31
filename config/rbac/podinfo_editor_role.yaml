@@ -1,0 +1,24 @@
+# permissions for end users to edit podinfoes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: podinfo-editor-role
+rules:
+- apiGroups:
+  - info.podinfo-operator.io
+  resources:
+  - podinfoes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - info.podinfo-operator.io
+  resources:
+  - podinfoes/status
+  verbs:
+  - get

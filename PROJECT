@@ -6,4 +6,14 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: podinfo-operator
 repo: github.com/jkremser/podinfo-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: podinfo-operator.io
+  group: info
+  kind: Podinfo
+  path: github.com/jkremser/podinfo-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"
