@@ -28,8 +28,8 @@ type PodinfoSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Podinfo. Edit podinfo_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	FrontendReplicas int `json:"frontend-replicas,omitempty"`
+	BackendReplicas  int `json:"backend-replicas,omitempty"`
 }
 
 // PodinfoStatus defines the observed state of Podinfo

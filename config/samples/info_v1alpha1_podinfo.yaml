@@ -3,5 +3,5 @@ kind: Podinfo
 metadata:
   name: podinfo-sample
 spec:
-  # Add fields here
-  foo: bar
+  backend-replicas: 2
+  frontend-replicas: 1
