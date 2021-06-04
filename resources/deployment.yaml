@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: webapp
 spec:
   minReadySeconds: 3
   revisionHistoryLimit: 5
@@ -22,7 +21,6 @@ spec:
       labels:
         app: frontend
     spec:
-      serviceAccountName: webapp
       containers:
       - name: frontend
         image: ghcr.io/stefanprodan/podinfo:5.2.1

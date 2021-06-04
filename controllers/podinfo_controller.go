@@ -17,17 +17,17 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
 	"context"
-	appsv1 "k8s.io/api/apps/v1"
+	"fmt"
+
 	"github.com/jkremser/podinfo-operator/controllers/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"k8s.io/apimachinery/pkg/types"
-	
 
 	v1alpha1 "github.com/jkremser/podinfo-operator/api/v1alpha1"
 )
@@ -53,6 +53,7 @@ type PodinfoReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *PodinfoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	log := ctrl.Log.WithName("test")
 
 	fmt.Printf("working..")
 	podInfo := &v1alpha1.Podinfo{}
@@ -60,27 +61,49 @@ func (r *PodinfoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-		 // Return and don't requeue
+			// Return and don't requeue
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
-  	}
-
-	d, _ := utils.GetDeployment("")
-	fmt.Printf("%+v\n", d)
-
+	}
 
 	frontendFound := &appsv1.Deployment{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name: "sdf",
-		Namespace: "sdf",
+		Name:      podInfo.Name + "-fe",
+		Namespace: podInfo.Namespace,
 	}, frontendFound)
+
+	if err != nil && errors.IsNotFound(err) {
+		// let's create a new one
+		frontendDeployment, e := utils.GetDeployment(podInfo.Name+"-fe", podInfo.Namespace, int32(podInfo.Spec.FrontendReplicas), podInfo.Spec.Message)
+
+		fmt.Printf("%+v\n", frontendDeployment)
+		fmt.Printf("%s", frontendDeployment.Namespace)
+
+		if e != nil {
+			log.Error(err, "Failed to read Deployment from yaml")
+			return ctrl.Result{}, e
+		}
+
+		e = r.Client.Create(context.TODO(), frontendDeployment)
+		if e != nil {
+			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", frontendDeployment.Namespace, "Deployment.Name", frontendDeployment.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+
+	} else if err != nil {
+		log.Error(err, "Failed to get Deployment")
+		return ctrl.Result{}, err
+	}
+	// no change (todo: check the changed fields)
+	return ctrl.Result{}, nil
 	//   backendFound := &appsv1.Deployment{}
 
 	// your logic here
-	testLog := ctrl.Log.WithName("test")
-	testLog.Info("Reconcile")
+	// testLog := ctrl.Log.WithName("test")
+	// testLog.Info("Reconcile")
 
 	// https://github.com/stefanprodan/podinfo/blob/master/deploy/webapp/frontend/deployment.yaml
 	// https://github.com/stefanprodan/podinfo/blob/master/deploy/webapp/backend/deployment.yaml
@@ -90,7 +113,7 @@ func (r *PodinfoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// - name: PODINFO_UI_MESSAGE
 	//   value: "hello world"
 
-	return ctrl.Result{}, nil
+	// return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
