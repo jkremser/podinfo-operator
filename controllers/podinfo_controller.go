@@ -17,14 +17,19 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
 	"context"
-
+	appsv1 "k8s.io/api/apps/v1"
+	"github.com/jkremser/podinfo-operator/controllers/utils"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/apimachinery/pkg/types"
+	
 
-	infov1alpha1 "github.com/jkremser/podinfo-operator/api/v1alpha1"
+	v1alpha1 "github.com/jkremser/podinfo-operator/api/v1alpha1"
 )
 
 // PodinfoReconciler reconciles a Podinfo object
@@ -49,7 +54,41 @@ type PodinfoReconciler struct {
 func (r *PodinfoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
+	fmt.Printf("working..")
+	podInfo := &v1alpha1.Podinfo{}
+	err := r.Client.Get(context.TODO(), req.NamespacedName, podInfo)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+		 // Return and don't requeue
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return ctrl.Result{}, err
+  	}
+
+	d, _ := utils.GetDeployment("")
+	fmt.Printf("%+v\n", d)
+
+
+	frontendFound := &appsv1.Deployment{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name: "sdf",
+		Namespace: "sdf",
+	}, frontendFound)
+	//   backendFound := &appsv1.Deployment{}
+
 	// your logic here
+	testLog := ctrl.Log.WithName("test")
+	testLog.Info("Reconcile")
+
+	// https://github.com/stefanprodan/podinfo/blob/master/deploy/webapp/frontend/deployment.yaml
+	// https://github.com/stefanprodan/podinfo/blob/master/deploy/webapp/backend/deployment.yaml
+	// + svcs
+
+	// env for custom ui msg:
+	// - name: PODINFO_UI_MESSAGE
+	//   value: "hello world"
 
 	return ctrl.Result{}, nil
 }
@@ -57,6 +96,6 @@ func (r *PodinfoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *PodinfoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infov1alpha1.Podinfo{}).
+		For(&v1alpha1.Podinfo{}).
 		Complete(r)
 }
