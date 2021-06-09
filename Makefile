@@ -198,3 +198,8 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+
+.PHONY: logs
+logs:
+	kubectl logs -f `kubectl get pod -l control-plane=controller-manager -o='jsonpath="{.items[0].metadata.name}"' -n podinfo-operator-system | sed 's/"//g'` -n podinfo-operator-system -c manager
