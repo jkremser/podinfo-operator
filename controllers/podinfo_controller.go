@@ -18,11 +18,13 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/go-logr/logr"
 	"github.com/jkremser/podinfo-operator/controllers/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -53,72 +55,131 @@ type PodinfoReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *PodinfoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	log := ctrl.Log.WithName("test")
+	log := ctrl.Log.WithName("podinfo_controller")
 
-	fmt.Printf("working..")
-	podInfo := &v1alpha1.Podinfo{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, podInfo)
+	// get podinfo that triggered the event
+	podinfo := &v1alpha1.Podinfo{}
+	err := r.Client.Get(context.TODO(), req.NamespacedName, podinfo)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Return and don't requeue
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		return ctrl.Result{}, err
-	}
-
-	frontendFound := &appsv1.Deployment{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      podInfo.Name + "-fe",
-		Namespace: podInfo.Namespace,
-	}, frontendFound)
-
-	if err != nil && errors.IsNotFound(err) {
-		// let's create a new one
-		frontendDeployment, e := utils.GetDeployment(podInfo.Name+"-fe", podInfo.Namespace, int32(podInfo.Spec.FrontendReplicas), podInfo.Spec.Message)
-
-		fmt.Printf("%+v\n", frontendDeployment)
-		fmt.Printf("%s", frontendDeployment.Namespace)
-
-		if e != nil {
-			log.Error(err, "Failed to read Deployment from yaml")
-			return ctrl.Result{}, e
-		}
-
-		e = r.Client.Create(context.TODO(), frontendDeployment)
-		if e != nil {
-			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", frontendDeployment.Namespace, "Deployment.Name", frontendDeployment.Name)
+			log.Info("podinfo was deleted", "name", req.NamespacedName.Name, "namespace", req.NamespacedName.Namespace)
+			err = r.DeleteAll(req.NamespacedName, log)
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, nil
-
-	} else if err != nil {
-		log.Error(err, "Failed to get Deployment")
+		// Error reading the object - requeue the request -> can loop
 		return ctrl.Result{}, err
 	}
-	// no change (todo: check the changed fields)
+
+	// create deployment and service for backend
+	err = r.CreateIfNotExist(podinfo, true, log)
+	if err != nil {
+		log.Error(err, "Unable to deploy backend for podinfo")
+		return ctrl.Result{}, err
+	}
+
+	// create deployment and service for frontend
+	err = r.CreateIfNotExist(podinfo, false, log)
+	if err != nil {
+		log.Error(err, "Unable to deploy frontend for podinfo")
+		return ctrl.Result{}, err
+	}
+	// Don't requeue
 	return ctrl.Result{}, nil
-	//   backendFound := &appsv1.Deployment{}
+}
 
-	// your logic here
-	// testLog := ctrl.Log.WithName("test")
-	// testLog.Info("Reconcile")
+func (r *PodinfoReconciler) CreateIfNotExist(podinfo *v1alpha1.Podinfo, backend bool, log logr.Logger) error {
+	imgSuffix := "-fe"
+	if backend {
+		imgSuffix = "-be"
+	}
 
-	// https://github.com/stefanprodan/podinfo/blob/master/deploy/webapp/frontend/deployment.yaml
-	// https://github.com/stefanprodan/podinfo/blob/master/deploy/webapp/backend/deployment.yaml
-	// + svcs
+	// deployment
+	deploymentFound := &appsv1.Deployment{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name:      podinfo.Name + imgSuffix,
+		Namespace: podinfo.Namespace,
+	}, deploymentFound)
 
-	// env for custom ui msg:
-	// - name: PODINFO_UI_MESSAGE
-	//   value: "hello world"
+	if err != nil && errors.IsNotFound(err) {
+		// let's create a new one <this uses yaml as a template, but failed during the client.create>
+		// frontendDeployment, e := utils.GetDeployment(podInfo.Name+imgSuffix, "podinfo-operator-system", int32(podInfo.Spec.FrontendReplicas), podInfo.Spec.Message)
 
-	// return ctrl.Result{}, nil
+		log.Info("podinfo was created")
+		deployment := utils.PodinfoDeployment(podinfo, backend)
+		// fmt.Printf("%+v\n", deployment)
+
+		e := r.Create(context.TODO(), deployment)
+		if e != nil {
+			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", deployment.Namespace, "Deployment.Name", deployment.Name)
+			return err
+		}
+	} else if err == nil { // change in podinfo custom resource
+		log.Info("podinfo was changed")
+		deployment := utils.PodinfoDeployment(podinfo, backend)
+		r.Update(context.TODO(), deployment)
+	} else if err != nil {
+		log.Error(err, "Failed to get Deployment")
+		return err
+	}
+
+	// service
+	svcFound := &corev1.Service{}
+	err = r.Get(context.TODO(), types.NamespacedName{
+		Name:      podinfo.Name + imgSuffix,
+		Namespace: podinfo.Namespace,
+	}, svcFound)
+
+	if err != nil && errors.IsNotFound(err) {
+		svc := utils.PodinfoService(podinfo, backend)
+		// fmt.Printf("%+v\n", svc)
+
+		e := r.Create(context.TODO(), svc)
+		if e != nil {
+			log.Error(err, "Failed to create new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
+			return err
+		}
+		return nil
+
+	} else if err == nil {
+		log.Info("Service is already there, no need to change it")
+	} else if err != nil {
+		log.Error(err, "Failed to get Service")
+		return err
+	}
+	return nil
+}
+
+func (r *PodinfoReconciler) DeleteAll(nn types.NamespacedName, log logr.Logger) error {
+	for _, suffix := range [2]string{"-fe", "-be"} {
+		commonMeta := metav1.ObjectMeta{
+			Name:      nn.Name + suffix,
+			Namespace: nn.Namespace,
+		}
+		err := r.Delete(context.TODO(), &corev1.Service{
+			ObjectMeta: commonMeta,
+		})
+		if err != nil {
+			log.Error(err, "Unable to delete service", "service.name", nn.Name)
+			return err
+		}
+
+		err = r.Delete(context.TODO(), &appsv1.Deployment{
+			ObjectMeta: commonMeta,
+		})
+		if err != nil {
+			log.Error(err, "Unable to delete deployment", "deployment.name", nn.Name)
+			return err
+		}
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PodinfoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Podinfo{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }
