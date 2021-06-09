@@ -43,6 +43,9 @@ type PodinfoReconciler struct {
 //+kubebuilder:rbac:groups=info.podinfo-operator.io,resources=podinfoes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=info.podinfo-operator.io,resources=podinfoes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=info.podinfo-operator.io,resources=podinfoes/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=deployments,verbs=get;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;watch;list;create;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -105,7 +108,9 @@ func (r *PodinfoReconciler) CreateIfNotExist(podinfo *v1alpha1.Podinfo, backend 
 		// let's create a new one <this uses yaml as a template, but failed during the client.create>
 		// frontendDeployment, e := utils.GetDeployment(podInfo.Name+imgSuffix, "podinfo-operator-system", int32(podInfo.Spec.FrontendReplicas), podInfo.Spec.Message)
 
-		log.Info("podinfo was created")
+		if backend {
+			log.Info("podinfo was created", "name", podinfo.Name, "namespace", podinfo.Namespace)
+		}
 		deployment := utils.PodinfoDeployment(podinfo, backend)
 		// fmt.Printf("%+v\n", deployment)
 
@@ -115,7 +120,9 @@ func (r *PodinfoReconciler) CreateIfNotExist(podinfo *v1alpha1.Podinfo, backend 
 			return err
 		}
 	} else if err == nil { // change in podinfo custom resource
-		log.Info("podinfo was changed")
+		if backend {
+			log.Info("podinfo was changed", "name", podinfo.Name, "namespace", podinfo.Namespace)
+		}
 		deployment := utils.PodinfoDeployment(podinfo, backend)
 		r.Update(context.TODO(), deployment)
 	} else if err != nil {
@@ -179,7 +186,7 @@ func (r *PodinfoReconciler) DeleteAll(nn types.NamespacedName, log logr.Logger) 
 func (r *PodinfoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Podinfo{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.Service{}).
+		// Owns(&appsv1.Deployment{}).
+		// Owns(&corev1.Service{}).
 		Complete(r)
 }
