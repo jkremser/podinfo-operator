@@ -203,3 +203,15 @@ catalog-push: ## Push a catalog image.
 .PHONY: logs
 logs:
 	kubectl logs -f `kubectl get pod -l control-plane=controller-manager -o='jsonpath="{.items[0].metadata.name}"' -n podinfo-operator-system | sed 's/"//g'` -n podinfo-operator-system -c manager
+
+
+.PHONY: build-and-deploy-latest
+build-and-deploy-latest:
+	docker build . -t podinfo-operator:test
+	k3d image import podinfo-operator:test -c test-cluster
+	$(MAKE) deploy IMG="podinfo-operator:test"
+
+# executes terra-tests
+.PHONY: terratest
+terratest: # Run terratest suite
+	cd terratest/test/ && go mod download && go test -v -timeout 15m -parallel=12

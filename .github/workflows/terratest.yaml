@@ -1,0 +1,25 @@
+name: Terratest
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  terratest:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Create k3s Cluster
+        uses: AbsaOSS/k3d-action@v1.4.0
+        with:
+          cluster-name: "test-cluster"
+          args: >-
+            --agents 1
+            
+      - name: podinfo-operator deployment
+        run: make build-and-deploy-latest
+
+      - name: Terratest
+        run: make terratest
