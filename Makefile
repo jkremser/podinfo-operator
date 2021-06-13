@@ -214,4 +214,4 @@ build-and-deploy-latest:
 # executes terra-tests
 .PHONY: terratest
 terratest: # Run terratest suite
-	cd terratest/test/ && go mod download && go test -v -timeout 15m -parallel=12
+	cd terratest/test/ && go mod download && go test -v

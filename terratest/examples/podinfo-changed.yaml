@@ -1,0 +1,8 @@
+apiVersion: info.podinfo-operator.io/v1alpha1
+kind: Podinfo
+metadata:
+  name: podinfo-sample
+spec:
+  backend-replicas: 3
+  frontend-replicas: 2
+  message: "Hello Terratest"
