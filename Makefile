@@ -211,7 +211,6 @@ build-and-deploy-latest:
 	k3d image import podinfo-operator:test -c test-cluster
 	$(MAKE) deploy IMG="podinfo-operator:test"
 
-# executes terra-tests
 .PHONY: terratest
-terratest: # Run terratest suite
+terratest:
 	cd terratest/test/ && go mod download && go test -v

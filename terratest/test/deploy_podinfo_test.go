@@ -25,7 +25,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/retry"
-	"github.com/gruntwork-io/terratest/modules/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,11 +45,11 @@ func TestDeployPodinfo(t *testing.T) {
 	url := fmt.Sprintf("http://%s", k8s.GetServiceEndpoint(t, options, service, 5000))
 
 	backend_rs := k8s.GetReplicaSet(t, options, "podinfo-sample-be")
-	assert.Equal(t, 2, backend_rs.Replicas)
+	assert.Equal(t, 2, backend_rs.Spec.Replicas)
 	// or k8s.WaitUntilNumPodsCreated w/ some label
 
 	frontend_rs := k8s.GetReplicaSet(t, options, "podinfo-sample-fe")
-	assert.Equal(t, 1, frontend_rs.Replicas)
+	assert.Equal(t, 1, frontend_rs.Spec.Replicas)
 
 	http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Podinfo", 30, 3*time.Second)
 	// http_helper.HttpGetWithRetryWithCustomValidation(
@@ -72,17 +71,17 @@ func TestDeployPodinfo(t *testing.T) {
 	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 1*time.Second)
 
 	backend_rs = k8s.GetReplicaSet(t, options, "podinfo-sample-be")
-	assert.Equal(t, 3, backend_rs.Replicas)
+	assert.Equal(t, 3, backend_rs.Spec.Replicas)
 
 	frontend_rs = k8s.GetReplicaSet(t, options, "podinfo-sample-fe")
-	assert.Equal(t, 2, frontend_rs.Replicas)
+	assert.Equal(t, 2, frontend_rs.Spec.Replicas)
 
 	http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Terratest", 30, 3*time.Second)
 
 	// cr deleted
 	k8s.KubectlDelete(t, options, changedPodinfoPath)
 	waitUntilServiceIsGone(t, options, "podinfo-sample-fe", 10, 1*time.Second)
-	_, err := k8s.GetReplicaSet(t, options, "podinfo-sample-be")
+	_, err := k8s.GetReplicaSetE(t, options, "podinfo-sample-be")
 	if err != nil {
 		require.Error(t, err)
 	}
