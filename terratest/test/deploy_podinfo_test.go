@@ -19,6 +19,7 @@ package test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -61,19 +62,20 @@ func TestDeployPodinfo(t *testing.T) {
 	desiredFrontendReplicas := 1
 	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 30, 2*time.Second)
 
-	// http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Podinfo", 30, 2*time.Second)
-	http_helper.HttpGetWithRetryWithCustomValidation(
-		t,
-		url,
-		nil,
-		30,
-		2*time.Second,
-		func(statusCode int, body string) bool {
-			isOk := statusCode == 200
-			customMsg := strings.Contains(body, "Hello Podinfo")
-			return isOk && customMsg
-		},
-	)
+	if _, ci := os.LookupEnv("GITHUB_ACTION"); !ci {
+		http_helper.HttpGetWithRetryWithCustomValidation(
+			t,
+			url,
+			nil,
+			30,
+			2*time.Second,
+			func(statusCode int, body string) bool {
+				isOk := statusCode == 200
+				customMsg := strings.Contains(body, "Hello Podinfo")
+				return isOk && customMsg
+			},
+		)
+	}
 
 	// update of custom resource
 	changedPodinfoPath := "../examples/podinfo-changed.yaml"
@@ -88,18 +90,20 @@ func TestDeployPodinfo(t *testing.T) {
 	desiredFrontendReplicas = 2
 	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 50, 3*time.Second)
 
-	http_helper.HttpGetWithRetryWithCustomValidation(
-		t,
-		url,
-		nil,
-		30,
-		2*time.Second,
-		func(statusCode int, body string) bool {
-			isOk := statusCode == 200
-			customMsg := strings.Contains(body, "Hello Terratest")
-			return isOk && customMsg
-		},
-	)
+	if _, ci := os.LookupEnv("GITHUB_ACTION"); !ci {
+		http_helper.HttpGetWithRetryWithCustomValidation(
+			t,
+			url,
+			nil,
+			30,
+			2*time.Second,
+			func(statusCode int, body string) bool {
+				isOk := statusCode == 200
+				customMsg := strings.Contains(body, "Hello Terratest")
+				return isOk && customMsg
+			},
+		)
+	}
 
 	// cr deleted
 	k8s.KubectlDelete(t, options, changedPodinfoPath)
