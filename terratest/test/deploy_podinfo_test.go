@@ -32,12 +32,12 @@ import (
 func TestDeployPodinfo(t *testing.T) {
 	t.Parallel()
 
-	kubeNamespacePath := "../examples/namespace.yml"
+	kubeNamespacePath := "../examples/namespace.yaml"
 	options := k8s.NewKubectlOptions("", "", "test-terratest")
 	defer k8s.KubectlDelete(t, options, kubeNamespacePath)
 	k8s.KubectlApply(t, options, kubeNamespacePath)
 
-	podinfoPath := "../examples/podinfo.yml"
+	podinfoPath := "../examples/podinfo.yaml"
 	k8s.KubectlApply(t, options, podinfoPath)
 
 	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 1*time.Second)
@@ -65,7 +65,7 @@ func TestDeployPodinfo(t *testing.T) {
 	// )
 
 	// update of custom resource
-	changedPodinfoPath := "../examples/podinfo-changed.yml"
+	changedPodinfoPath := "../examples/podinfo-changed.yaml"
 	k8s.KubectlApply(t, options, changedPodinfoPath)
 
 	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 1*time.Second)
