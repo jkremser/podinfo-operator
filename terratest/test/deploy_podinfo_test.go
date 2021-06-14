@@ -25,8 +25,8 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/retry"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDeployPodinfo(t *testing.T) {
@@ -44,12 +44,20 @@ func TestDeployPodinfo(t *testing.T) {
 	service := k8s.GetService(t, options, "podinfo-sample-fe")
 	url := fmt.Sprintf("http://%s", k8s.GetServiceEndpoint(t, options, service, 5000))
 
-	backend_rs := k8s.GetReplicaSet(t, options, "podinfo-sample-be")
-	assert.Equal(t, 2, backend_rs.Spec.Replicas)
-	// or k8s.WaitUntilNumPodsCreated w/ some label
+	// this doesn't work because the replica set name is suffixed by some random chars (like pods)
+	// backend_rs := k8s.GetReplicaSet(t, options, "podinfo-sample-be")
+	// assert.Equal(t, 2, backend_rs.Spec.Replicas)
+	backendLabels := metav1.ListOptions{
+		LabelSelector: "app=podinfo-sample-be",
+	}
+	desiredBackendReplicas := 2
+	k8s.WaitUntilNumPodsCreated(t, options, backendLabels, desiredBackendReplicas, 30, 1*time.Second)
 
-	frontend_rs := k8s.GetReplicaSet(t, options, "podinfo-sample-fe")
-	assert.Equal(t, 1, frontend_rs.Spec.Replicas)
+	frontendLabels := metav1.ListOptions{
+		LabelSelector: "app=podinfo-sample-fe",
+	}
+	desiredFrontendReplicas := 1
+	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 30, 1*time.Second)
 
 	http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Podinfo", 30, 3*time.Second)
 	// http_helper.HttpGetWithRetryWithCustomValidation(
@@ -70,11 +78,11 @@ func TestDeployPodinfo(t *testing.T) {
 
 	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 1*time.Second)
 
-	backend_rs = k8s.GetReplicaSet(t, options, "podinfo-sample-be")
-	assert.Equal(t, 3, backend_rs.Spec.Replicas)
+	desiredBackendReplicas = 3
+	k8s.WaitUntilNumPodsCreated(t, options, backendLabels, desiredBackendReplicas, 30, 1*time.Second)
 
-	frontend_rs = k8s.GetReplicaSet(t, options, "podinfo-sample-fe")
-	assert.Equal(t, 2, frontend_rs.Spec.Replicas)
+	desiredFrontendReplicas = 2
+	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 30, 1*time.Second)
 
 	http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Terratest", 30, 3*time.Second)
 
