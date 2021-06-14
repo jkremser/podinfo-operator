@@ -17,7 +17,9 @@ limitations under the License.
 package test
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,7 +44,7 @@ func TestDeployPodinfo(t *testing.T) {
 
 	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 1*time.Second)
 	service := k8s.GetService(t, options, "podinfo-sample-fe")
-	url := fmt.Sprintf("http://%s", k8s.GetServiceEndpoint(t, options, service, 5000))
+	url := fmt.Sprintf("http://%s", k8s.GetServiceEndpoint(t, options, service, 80))
 
 	// this doesn't work because the replica set name is suffixed by some random chars (like pods)
 	// backend_rs := k8s.GetReplicaSet(t, options, "podinfo-sample-be")
@@ -51,44 +53,57 @@ func TestDeployPodinfo(t *testing.T) {
 		LabelSelector: "app=podinfo-sample-be",
 	}
 	desiredBackendReplicas := 2
-	k8s.WaitUntilNumPodsCreated(t, options, backendLabels, desiredBackendReplicas, 30, 1*time.Second)
+	k8s.WaitUntilNumPodsCreated(t, options, backendLabels, desiredBackendReplicas, 30, 2*time.Second)
 
 	frontendLabels := metav1.ListOptions{
 		LabelSelector: "app=podinfo-sample-fe",
 	}
 	desiredFrontendReplicas := 1
-	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 30, 1*time.Second)
+	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 30, 2*time.Second)
 
-	http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Podinfo", 30, 3*time.Second)
-	// http_helper.HttpGetWithRetryWithCustomValidation(
-	//     t,
-	//     url,
-	//     30,
-	//     3*time.Second,
-	//     func(statusCode int, body string) bool {
-	//         isOk := statusCode == 200
-	//         customMsg := strings.Contains(body, "Hello Podinfo")
-	//         return isOk && customMsg
-	//     },
-	// )
+	// http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Podinfo", 30, 2*time.Second)
+	http_helper.HttpGetWithRetryWithCustomValidation(
+		t,
+		url,
+		nil,
+		30,
+		2*time.Second,
+		func(statusCode int, body string) bool {
+			isOk := statusCode == 200
+			customMsg := strings.Contains(body, "Hello Podinfo")
+			return isOk && customMsg
+		},
+	)
 
 	// update of custom resource
 	changedPodinfoPath := "../examples/podinfo-changed.yaml"
 	k8s.KubectlApply(t, options, changedPodinfoPath)
 
-	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 1*time.Second)
+	k8s.WaitUntilServiceAvailable(t, options, "podinfo-sample-fe", 10, 2*time.Second)
 
 	desiredBackendReplicas = 3
-	k8s.WaitUntilNumPodsCreated(t, options, backendLabels, desiredBackendReplicas, 30, 1*time.Second)
+	// this takes more time, because the pods in the terminating state will still be listed (they still match the label)
+	k8s.WaitUntilNumPodsCreated(t, options, backendLabels, desiredBackendReplicas, 50, 3*time.Second)
 
 	desiredFrontendReplicas = 2
-	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 30, 1*time.Second)
+	k8s.WaitUntilNumPodsCreated(t, options, frontendLabels, desiredFrontendReplicas, 50, 3*time.Second)
 
-	http_helper.HttpGetWithRetry(t, url, nil, 200, "Hello Terratest", 30, 3*time.Second)
+	http_helper.HttpGetWithRetryWithCustomValidation(
+		t,
+		url,
+		nil,
+		30,
+		2*time.Second,
+		func(statusCode int, body string) bool {
+			isOk := statusCode == 200
+			customMsg := strings.Contains(body, "Hello Terratest")
+			return isOk && customMsg
+		},
+	)
 
 	// cr deleted
 	k8s.KubectlDelete(t, options, changedPodinfoPath)
-	waitUntilServiceIsGone(t, options, "podinfo-sample-fe", 10, 1*time.Second)
+	waitUntilServiceIsGone(t, options, "podinfo-sample-fe", 40, 3*time.Second)
 	_, err := k8s.GetReplicaSetE(t, options, "podinfo-sample-be")
 	if err != nil {
 		require.Error(t, err)
@@ -103,14 +118,11 @@ func waitUntilServiceIsGone(t *testing.T, options *k8s.KubectlOptions, serviceNa
 		retries,
 		sleepBetweenRetries,
 		func() (string, error) {
-			service, err := k8s.GetServiceE(t, options, serviceName)
-			if err != nil {
-				return "", err
+			_, err := k8s.GetServiceE(t, options, serviceName)
+			if err == nil {
+				return "Service is still there", errors.New("Service is still there")
 			}
 
-			if k8s.IsServiceAvailable(service) {
-				return "", k8s.NewServiceNotAvailableError(service)
-			}
 			return "Service is now gone", nil
 		},
 	)
