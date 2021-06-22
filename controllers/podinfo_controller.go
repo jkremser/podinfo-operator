@@ -124,7 +124,10 @@ func (r *PodinfoReconciler) CreateIfNotExist(podinfo *v1alpha1.Podinfo, backend 
 			log.Info("podinfo was changed", "name", podinfo.Name, "namespace", podinfo.Namespace)
 		}
 		deployment := utils.PodinfoDeployment(podinfo, backend)
-		r.Update(context.TODO(), deployment)
+		err = r.Update(context.TODO(), deployment)
+		if err != nil {
+			log.Error(err, "Failed to update the deployment", "deyployment", deployment)
+		}
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return err
