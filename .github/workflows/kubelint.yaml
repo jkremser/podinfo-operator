@@ -1,0 +1,29 @@
+name: Check Kubernetes YAMLs
+
+on:
+  pull_request:
+    branches: 
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Scan repo with kube-linter (./terratest/examples)
+        uses: stackrox/kube-linter-action@v1.0.2
+        with:
+          directory: ./terratest/examples/
+
+      - name: Scan repo with kube-linter (./config)
+        uses: stackrox/kube-linter-action@v1.0.2
+        with:
+          directory: ./config/
